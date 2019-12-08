@@ -12,21 +12,21 @@ import (
 // on the configured input channel
 type Broadcaster interface {
 	Run(ctx context.Context)
-	Subscribe(c *chan interface{}) string
+	Subscribe(c chan interface{}) string
 	Unsubscribe(id string)
 }
 
 type broadcaster struct {
 	inCh        chan interface{}
 	mu          sync.RWMutex
-	subscribers map[string]*chan interface{}
+	subscribers map[string]chan interface{}
 }
 
 // New returns an initialized Broadcaster with the input channel set to "input"
 func New(input chan interface{}) Broadcaster {
 	return &broadcaster{
 		inCh:        input,
-		subscribers: make(map[string]*chan interface{}),
+		subscribers: make(map[string]chan interface{}),
 	}
 }
 
@@ -40,7 +40,7 @@ func (b *broadcaster) Run(ctx context.Context) {
 			b.mu.RLock()
 			for sub, c := range b.subscribers {
 				select {
-				case *c <- v:
+				case c <- v:
 				default:
 					log.Printf("subscriber %s blocked, skipping", sub)
 				}
@@ -53,7 +53,7 @@ func (b *broadcaster) Run(ctx context.Context) {
 // Subscribe adds a subscriber channel to the broadcaster and returns an ID used
 // to unsubscribe from the broadcaster. Before closing the given channel
 // subscribers must call Unsubscribe() to avoid panics
-func (b *broadcaster) Subscribe(c *chan interface{}) string {
+func (b *broadcaster) Subscribe(c chan interface{}) string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	u := uuid.New().String()
